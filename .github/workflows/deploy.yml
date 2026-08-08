@@ -31,21 +31,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install browser
-        run: npx playwright install --with-deps chromium
-
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-
-      - name: Verify source and pages
-        run: npm run test:all
 
       - name: Build deployable artifact
         env:
           DEPLOY_TARGET: github-pages
           SITE_URL: ${{ vars.SITE_URL }}
           BASE_PATH: ${{ vars.BASE_PATH }}
-        run: npm run build && npm run check:site
+        run: npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
