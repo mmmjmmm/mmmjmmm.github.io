@@ -725,7 +725,8 @@ html[data-theme='dark'] .theme-toggle__icon {
   gap: 8px;
   margin-bottom: 42px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 1rem;
+  font-family: var(--display);
 }
 
 .breadcrumb a {
@@ -810,9 +811,8 @@ html[data-theme='dark'] .theme-toggle__icon {
 
 .article-header {
   width: 80%;
-  margin: 0 auto clamp(56px, 7vw, 84px);
+  margin: 0 auto clamp(56px, 7vw, 40px);
   padding: clamp(38px, 5vw, 58px) 0 30px;
-  border-bottom: 1px solid var(--border-strong);
 }
 
 .article-header h1 {
@@ -838,8 +838,7 @@ html[data-theme='dark'] .theme-toggle__icon {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 
 .article-header__footer .article-meta {
