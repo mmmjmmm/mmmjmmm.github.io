@@ -1,4 +1,4 @@
-# MJM 的技术博客
+# Lemonade 的技术博客
 
 一个面向技术文章和学习笔记的纯静态博客。使用 Astro 与 Markdown，内置全文搜索、标签、RSS、站点地图、深色模式、代码复制、文章目录和 GitHub Pages 自动发布。
 

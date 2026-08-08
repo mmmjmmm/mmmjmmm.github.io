@@ -320,9 +320,11 @@ html[data-theme='dark'] .theme-toggle__icon {
 
 .reading-gate {
   position: relative;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-height: max(520px, calc(100svh - 87px));
-  place-items: center;
+  justify-content: center;
+  align-items: center;
   overflow: hidden;
   isolation: isolate;
 }
@@ -407,6 +409,13 @@ html[data-theme='dark'] .theme-toggle__icon {
   stroke-linejoin: round;
   stroke-width: 1.6;
   transition: transform var(--transition);
+}
+
+.slogan {
+  margin-top: 20px;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: clamp(1rem, 3.2vw, 2rem);
 }
 
 .reading-gate__cta:hover {

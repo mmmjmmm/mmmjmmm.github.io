@@ -1,11 +1,11 @@
 ---
 title: 欢迎来到我的技术博客
-description: 这是这个博客的第一篇文章，也是一份关于内容方向、写作方式和网站能力的简短说明。
 publishedAt: 2026-08-08
 type: article
 tags:
   - 博客
   - Astro
+  - test
 draft: false
 ---
 
