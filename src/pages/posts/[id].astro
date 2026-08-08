@@ -2,6 +2,7 @@
 import { render, type CollectionEntry } from 'astro:content';
 
 import TableOfContents from '../../components/TableOfContents.astro';
+import { SITE } from '../../config/site';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { formatDate, tagSlug } from '../../lib/blog';
 import { getPublishedPosts, getReadingTime } from '../../lib/posts';
@@ -27,7 +28,7 @@ const readingTime = getReadingTime(post);
 
 <BaseLayout
   title={post.data.title}
-  description={post.data.description}
+  description={post.data.description ?? SITE.description}
   type="article"
   publishedAt={post.data.publishedAt}
   updatedAt={post.data.updatedAt}
@@ -42,9 +43,13 @@ const readingTime = getReadingTime(post);
 
     <header class="article-header">
       <h1 data-pagefind-meta="title">{post.data.title}</h1>
-      <p class="article-header__description" data-pagefind-meta="description">
-        {post.data.description}
-      </p>
+      {
+        post.data.description && (
+          <p class="article-header__description" data-pagefind-meta="description">
+            {post.data.description}
+          </p>
+        )
+      }
       <div class="article-header__footer">
         <div class="article-meta">
           <time datetime={post.data.publishedAt.toISOString()}

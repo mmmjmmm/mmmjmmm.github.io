@@ -37,7 +37,7 @@ const { posts } = Astro.props;
             <h2>
               <a href={withBase(`posts/${post.id}/`)}>{post.data.title}</a>
             </h2>
-            <p>{post.data.description}</p>
+            {post.data.description && <p>{post.data.description}</p>}
             <ul class="tag-list" aria-label="文章标签">
               {post.data.tags.map((tag) => (
                 <li>

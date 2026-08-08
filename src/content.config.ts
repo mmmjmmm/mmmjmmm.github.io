@@ -11,7 +11,7 @@ const posts = defineCollection({
   schema: z
     .object({
       title: z.string().min(1).max(100),
-      description: z.string().min(10).max(200),
+      description: z.string().min(10).max(200).optional(),
       publishedAt: z.coerce.date(),
       updatedAt: z.coerce.date().optional(),
       type: z.enum(['article', 'note']),

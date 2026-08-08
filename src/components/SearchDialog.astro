@@ -1,5 +1,24 @@
 ---
+import { getPublishedPosts } from '../lib/posts';
 import { withBase } from '../lib/urls';
+
+const developmentSearchItems = import.meta.env.DEV
+  ? (await getPublishedPosts()).map((post) => {
+      const plainBody = (post.body ?? '')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/[#>*_`\[\]()-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return {
+        url: withBase(`posts/${post.id}/`),
+        title: post.data.title,
+        excerpt: post.data.description ?? plainBody.slice(0, 100),
+        searchText: [post.data.title, post.data.description, ...post.data.tags, plainBody]
+          .filter(Boolean)
+          .join(' '),
+      };
+    })
+  : undefined;
 ---
 
 <dialog
@@ -35,5 +54,16 @@ import { withBase } from '../lib/urls';
     <ol class="search-results" aria-label="搜索结果"></ol>
   </div>
 </dialog>
+
+{
+  developmentSearchItems && (
+    <script
+      is:inline
+      type="application/json"
+      data-search-fallback
+      set:html={JSON.stringify(developmentSearchItems).replaceAll('<', '\\u003c')}
+    />
+  )
+}
 
 <script is:inline type="module" src={withBase('search.js')}></script>

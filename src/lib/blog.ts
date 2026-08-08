@@ -2,7 +2,7 @@ export type BlogPostLike = {
   id: string;
   data: {
     title: string;
-    description: string;
+    description?: string;
     publishedAt: Date;
     updatedAt?: Date;
     draft?: boolean;

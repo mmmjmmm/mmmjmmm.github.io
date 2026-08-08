@@ -2,6 +2,7 @@ const dialog = document.querySelector('[data-search-dialog]');
 const input = dialog?.querySelector('input[type="search"]');
 const statusElement = dialog?.querySelector('.search-status');
 const results = dialog?.querySelector('.search-results');
+const fallbackData = document.querySelector('[data-search-fallback]');
 let pagefind;
 let requestNumber = 0;
 
@@ -42,6 +43,27 @@ function showResults(items) {
   }
 }
 
+function searchFallback(query) {
+  if (!fallbackData?.textContent) return undefined;
+
+  try {
+    const normalized = query.normalize('NFKC').toLocaleLowerCase('zh-CN');
+    return JSON.parse(fallbackData.textContent)
+      .filter((item) =>
+        item.searchText.normalize('NFKC').toLocaleLowerCase('zh-CN').includes(normalized),
+      )
+      .slice(0, 8)
+      .map((item) => ({
+        url: item.url,
+        meta: { title: item.title },
+        excerpt: item.excerpt,
+      }));
+  } catch (error) {
+    console.error('[search] Development search data is invalid', error);
+    return undefined;
+  }
+}
+
 async function search(query) {
   const normalized = query.trim();
   const currentRequest = ++requestNumber;
@@ -62,7 +84,15 @@ async function search(query) {
     setStatus(items.length ? `找到 ${response.results.length} 篇相关文章` : '没有找到相关文章');
   } catch (error) {
     console.error('[search] Pagefind query failed', error);
-    if (currentRequest === requestNumber) setStatus('搜索暂时不可用，请刷新页面后重试');
+    if (currentRequest !== requestNumber) return;
+
+    const items = searchFallback(normalized);
+    if (items) {
+      showResults(items);
+      setStatus(items.length ? `找到 ${items.length} 篇相关文章` : '没有找到相关文章');
+    } else {
+      setStatus('搜索暂时不可用，请刷新页面后重试');
+    }
   }
 }
 
