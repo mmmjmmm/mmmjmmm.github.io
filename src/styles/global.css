@@ -874,7 +874,7 @@ html[data-theme='dark'] .theme-toggle__icon {
 .toc__title {
   margin-bottom: 14px;
   color: var(--text);
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   font-weight: 760;
   letter-spacing: 0.08em;
 }
@@ -889,8 +889,8 @@ html[data-theme='dark'] .theme-toggle__icon {
 
 .toc li {
   color: var(--muted);
-  font-size: 0.77rem;
-  line-height: 1.5;
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
 .toc .toc-depth-3 {
@@ -1488,7 +1488,7 @@ kbd {
     padding: 15px 18px;
     color: var(--text);
     cursor: pointer;
-    font-size: 0.78rem;
+    font-size: 0.9rem;
     font-weight: 760;
     letter-spacing: 0.06em;
     list-style: none;
