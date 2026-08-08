@@ -1,0 +1,12 @@
+.DS_Store
+.astro/
+dist/
+node_modules/
+.worktrees/
+.env
+.env.*
+!.env.example
+
+# Local design references; not part of the published site.
+/compose-template-download-links/
+/template.zip
