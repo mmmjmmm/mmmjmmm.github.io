@@ -847,8 +847,11 @@ html[data-theme='dark'] .theme-toggle__icon {
 }
 
 .article-sidebar {
+  position: sticky;
+  top: 32px;
   min-width: 0;
   margin-bottom: 0;
+  align-self: start;
 }
 
 .mobile-toc {
@@ -856,8 +859,7 @@ html[data-theme='dark'] .theme-toggle__icon {
 }
 
 .desktop-toc {
-  position: sticky;
-  top: 32px;
+  position: static;
 }
 
 .desktop-toc .toc {
@@ -1465,6 +1467,7 @@ kbd {
   }
 
   .article-sidebar {
+    position: static;
     margin-bottom: 36px;
   }
 
