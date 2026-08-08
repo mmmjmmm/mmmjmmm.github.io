@@ -1,0 +1,39 @@
+---
+import { withBase } from '../lib/urls';
+---
+
+<dialog
+  class="search-dialog"
+  data-search-dialog
+  data-pagefind-url={withBase('pagefind/pagefind.js')}
+  data-base-url={import.meta.env.BASE_URL}
+>
+  <div class="search-panel">
+    <div class="search-panel__topline">
+      <div>
+        <span class="eyebrow">SEARCH / 全文检索</span>
+        <h2>搜索文章</h2>
+      </div>
+      <form method="dialog">
+        <button class="round-action" type="submit" aria-label="关闭搜索">×</button>
+      </form>
+    </div>
+    <label class="search-field">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5"></circle>
+        <path d="m16 16 4 4"></path>
+      </svg>
+      <input
+        type="search"
+        aria-label="搜索文章"
+        placeholder="输入标题、标签或正文关键词…"
+        autocomplete="off"
+      />
+      <kbd>Esc</kbd>
+    </label>
+    <p class="search-status" role="status" aria-live="polite">输入关键词开始搜索</p>
+    <ol class="search-results" aria-label="搜索结果"></ol>
+  </div>
+</dialog>
+
+<script is:inline type="module" src={withBase('search.js')}></script>

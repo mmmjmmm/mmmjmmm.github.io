@@ -1,0 +1,182 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+
+import TableOfContents from '../../components/TableOfContents.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { findRelatedPosts, formatDate, tagSlug } from '../../lib/blog';
+import { getPublishedPosts, getReadingTime } from '../../lib/posts';
+import { withBase } from '../../lib/urls';
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+}
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+const posts = await getPublishedPosts();
+const currentIndex = posts.findIndex(({ id }) => id === post.id);
+const newerPost = currentIndex > 0 ? posts[currentIndex - 1] : undefined;
+const olderPost = currentIndex >= 0 ? posts[currentIndex + 1] : undefined;
+const relatedPosts = findRelatedPosts(post, posts);
+const readingTime = getReadingTime(post);
+const typeLabel = post.data.type === 'article' ? '技术文章' : '学习笔记';
+const typeCode = post.data.type === 'article' ? 'ARTICLE' : 'NOTE';
+---
+
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  type="article"
+  publishedAt={post.data.publishedAt}
+  updatedAt={post.data.updatedAt}
+  searchable
+>
+  <article class="article shell" data-pagefind-body>
+    <nav class="breadcrumb" aria-label="面包屑" data-pagefind-ignore>
+      <a href={withBase('')}>文章</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">正文</span>
+    </nav>
+
+    <header class="article-header">
+      <p class="eyebrow">{typeCode} / {typeLabel}</p>
+      <h1 data-pagefind-meta="title">{post.data.title}</h1>
+      <p class="article-header__description" data-pagefind-meta="description">
+        {post.data.description}
+      </p>
+      <div class="article-header__footer">
+        <div class="article-meta">
+          <time datetime={post.data.publishedAt.toISOString()}
+            >{formatDate(post.data.publishedAt)}</time
+          >
+          <span aria-hidden="true">·</span>
+          <span>{readingTime} 分钟阅读</span>
+          {
+            post.data.updatedAt && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>更新于 {formatDate(post.data.updatedAt)}</span>
+              </>
+            )
+          }
+        </div>
+        <ul class="tag-list" aria-label="文章标签">
+          {
+            post.data.tags.map((tag) => (
+              <li>
+                <a class="tag-pill" href={withBase(`tags/${encodeURIComponent(tagSlug(tag))}/`)}>
+                  {tag}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </header>
+
+    <div class="article-layout">
+      <aside class="article-sidebar" data-pagefind-ignore>
+        <TableOfContents headings={headings} />
+      </aside>
+      <div class="prose">
+        <Content />
+      </div>
+    </div>
+
+    <nav class="post-navigation" aria-label="相邻文章" data-pagefind-ignore>
+      {
+        newerPost ? (
+          <a href={withBase(`posts/${newerPost.id}/`)}>
+            <span>较新的文章</span>
+            <strong>← {newerPost.data.title}</strong>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        olderPost ? (
+          <a class="post-navigation__next" href={withBase(`posts/${olderPost.id}/`)}>
+            <span>更早的文章</span>
+            <strong>{olderPost.data.title} →</strong>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+    </nav>
+
+    {
+      relatedPosts.length > 0 && (
+        <section class="related-posts" aria-labelledby="related-heading" data-pagefind-ignore>
+          <header>
+            <p class="eyebrow">KEEP READING</p>
+            <h2 id="related-heading">相关文章</h2>
+          </header>
+          <div>
+            {relatedPosts.map((related) => (
+              <a href={withBase(`posts/${related.id}/`)}>
+                <span>{related.data.type === 'article' ? '技术文章' : '学习笔记'}</span>
+                <strong>{related.data.title}</strong>
+                <small>
+                  {formatDate(related.data.publishedAt)} · {getReadingTime(related)} 分钟
+                </small>
+              </a>
+            ))}
+          </div>
+        </section>
+      )
+    }
+  </article>
+</BaseLayout>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.prose pre').forEach((block) => {
+    const code = block.querySelector('code');
+    if (!code || block.querySelector('.copy-code')) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-code';
+    button.textContent = '复制代码';
+    button.setAttribute('aria-label', '复制代码');
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(code.innerText);
+        button.textContent = '已复制';
+        window.setTimeout(() => (button.textContent = '复制代码'), 1600);
+      } catch {
+        button.textContent = '复制失败';
+      }
+    });
+    block.append(button);
+  });
+
+  document.querySelectorAll<HTMLHeadingElement>('.prose :is(h2, h3)').forEach((heading) => {
+    if (!heading.id || heading.querySelector('.copy-heading')) return;
+    const headingText = heading.textContent?.trim() ?? '当前';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-heading';
+    button.textContent = '#';
+    button.setAttribute('aria-label', `复制“${headingText}”小节链接`);
+    button.addEventListener('click', async () => {
+      const url = new URL(window.location.href);
+      url.hash = heading.id;
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        window.history.replaceState(null, '', url);
+        button.textContent = '✓';
+        window.setTimeout(() => (button.textContent = '#'), 1600);
+      } catch {
+        button.textContent = '!';
+      }
+    });
+    heading.append(button);
+  });
+</script>

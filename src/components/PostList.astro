@@ -1,0 +1,72 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+import { formatDate, tagSlug } from '../lib/blog';
+import { getReadingTime } from '../lib/posts';
+import { withBase } from '../lib/urls';
+
+interface Props {
+  posts: CollectionEntry<'posts'>[];
+}
+
+const { posts } = Astro.props;
+---
+
+<div class="post-list">
+  {
+    posts.length > 0 ? (
+      posts.map((post, index) => (
+        <article class="post-row">
+          <div class="post-row__number" aria-hidden="true">
+            {String(index + 1).padStart(2, '0')}
+          </div>
+          <div class="post-row__body">
+            <div class="post-row__meta">
+              <span class="content-type">
+                {post.data.type === 'article' ? '技术文章' : '学习笔记'}
+              </span>
+              <span aria-hidden="true">·</span>
+              <time datetime={post.data.publishedAt.toISOString()}>
+                {formatDate(post.data.publishedAt)}
+              </time>
+              {post.data.updatedAt && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>更新于 {formatDate(post.data.updatedAt)}</span>
+                </>
+              )}
+              <span aria-hidden="true">·</span>
+              <span>{getReadingTime(post)} 分钟阅读</span>
+            </div>
+            <h2>
+              <a href={withBase(`posts/${post.id}/`)}>{post.data.title}</a>
+            </h2>
+            <p>{post.data.description}</p>
+            <ul class="tag-list" aria-label="文章标签">
+              {post.data.tags.map((tag) => (
+                <li>
+                  <a class="tag-pill" href={withBase(`tags/${encodeURIComponent(tagSlug(tag))}/`)}>
+                    {tag}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <a
+            class="post-row__arrow"
+            href={withBase(`posts/${post.id}/`)}
+            aria-label={`阅读《${post.data.title}》`}
+          >
+            <span aria-hidden="true">↗</span>
+          </a>
+        </article>
+      ))
+    ) : (
+      <div class="empty-state">
+        <p class="eyebrow">NO POSTS YET</p>
+        <h2>这里暂时还没有文章。</h2>
+        <p>写下第一篇 Markdown 笔记，它就会出现在这里。</p>
+      </div>
+    )
+  }
+</div>

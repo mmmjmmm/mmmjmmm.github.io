@@ -1,0 +1,23 @@
+---
+import { SITE } from '../config/site';
+import { withBase } from '../lib/urls';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="site-footer__inner shell">
+    <div>
+      <a class="wordmark wordmark--footer" href={withBase('')}>{SITE.name}</a>
+      <p>{SITE.description}</p>
+    </div>
+    <div class="footer-meta">
+      <nav aria-label="页脚导航">
+        <a href={withBase('rss.xml')}>RSS</a>
+        <a href={withBase('tags/')}>标签</a>
+        <a href={withBase('about/')}>关于</a>
+      </nav>
+      <p>© {year} {SITE.author} · Built with Astro</p>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f8dce8"/>
+      <stop offset=".48" stop-color="#ddd2ff"/>
+      <stop offset="1" stop-color="#ffe994"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#fbf8f3"/>
+  <rect x="55" y="55" width="1090" height="520" rx="34" fill="url(#bg)"/>
+  <circle cx="1010" cy="145" r="110" fill="#fff2a8" fill-opacity=".8"/>
+  <text x="110" y="170" fill="#292426" font-family="Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="5">TECH NOTES · LEARNING LOG</text>
+  <text x="110" y="330" fill="#211e20" font-family="Georgia, serif" font-size="92" font-weight="700">MJM 的技术博客</text>
+  <text x="110" y="410" fill="#4e4549" font-family="Arial, sans-serif" font-size="34">把复杂的技术，写成清楚的笔记。</text>
+</svg>

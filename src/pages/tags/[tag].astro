@@ -1,0 +1,39 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+import PostList from '../../components/PostList.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedPosts, getTagIndex, postsWithTag } from '../../lib/posts';
+import { withBase } from '../../lib/urls';
+
+interface Props {
+  name: string;
+  posts: CollectionEntry<'posts'>[];
+}
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  return getTagIndex(posts).map((tag) => ({
+    params: { tag: tag.slug },
+    props: { name: tag.name, posts: postsWithTag(posts, tag.slug) },
+  }));
+}
+
+const { name, posts } = Astro.props;
+---
+
+<BaseLayout title={`标签：${name}`} description={`浏览标签“${name}”下的所有文章。`}>
+  <section class="page-hero shell page-hero--tag-detail">
+    <nav class="breadcrumb" aria-label="面包屑">
+      <a href={withBase('tags/')}>所有标签</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{name}</span>
+    </nav>
+    <p class="eyebrow">TOPIC / {String(posts.length).padStart(2, '0')} POSTS</p>
+    <h1>#{name}</h1>
+    <p>这个主题下共有 {posts.length} 篇文章。</p>
+  </section>
+  <section class="archive-section shell" aria-label={`${name}标签文章`}>
+    <PostList posts={posts} />
+  </section>
+</BaseLayout>

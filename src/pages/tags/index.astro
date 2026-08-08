@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedPosts, getTagIndex } from '../../lib/posts';
+import { withBase } from '../../lib/urls';
+
+const posts = await getPublishedPosts();
+const tags = getTagIndex(posts);
+---
+
+<BaseLayout title="所有标签" description="按主题浏览博客中的技术文章与学习笔记。">
+  <section class="page-hero shell page-hero--tags">
+    <p class="eyebrow">INDEX / TOPICS</p>
+    <h1>所有标签</h1>
+    <p>沿着一个关键词，找到相关的实践和思考。</p>
+  </section>
+
+  <section class="tag-cloud shell" aria-label="标签列表">
+    {
+      tags.map((tag, index) => (
+        <a href={withBase(`tags/${encodeURIComponent(tag.slug)}/`)}>
+          <span class="tag-cloud__index">{String(index + 1).padStart(2, '0')}</span>
+          <strong>{tag.name}</strong>
+          <span>{tag.count} 篇文章</span>
+          <span class="tag-cloud__arrow" aria-hidden="true">
+            ↗
+          </span>
+        </a>
+      ))
+    }
+  </section>
+</BaseLayout>

@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../lib/urls';
+---
+
+<BaseLayout title="页面未找到" description="你访问的页面不存在或已经移动。">
+  <section class="not-found shell">
+    <p class="not-found__code" aria-hidden="true">404</p>
+    <div>
+      <p class="eyebrow">PAGE NOT FOUND</p>
+      <h1>这篇笔记<br />好像还没写。</h1>
+      <p>你访问的页面不存在，或者它已经换了位置。</p>
+      <div class="not-found__actions">
+        <a class="button-link" href={withBase('')}>回到文章列表 <span aria-hidden="true">→</span></a
+        >
+        <button class="outline-button" type="button" data-search-open>搜索文章</button>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

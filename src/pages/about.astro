@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../lib/urls';
+---
+
+<BaseLayout title="关于" description="关于这个技术博客，以及我为什么持续记录。">
+  <section class="about shell">
+    <div class="about__intro">
+      <p class="eyebrow">ABOUT / 关于</p>
+      <h1>你好，<br />我是 MJM。</h1>
+    </div>
+    <div class="about__content">
+      <p class="about__lead">我用这个博客记录技术实践和学习笔记。</p>
+      <p>
+        这里更像一块公开的长期记忆：把遇到的问题、做过的取舍和真正理解的知识整理下来，也希望这些文字能给碰到相同问题的人一点帮助。
+      </p>
+      <p>内容会优先追求准确和清楚。文章可能不会很多，但会尽量让每一篇都值得读完。</p>
+      <div class="about__principles">
+        <div><span>01</span><strong>先实践，再总结</strong></div>
+        <div><span>02</span><strong>讲清原因和取舍</strong></div>
+        <div><span>03</span><strong>保持简单和诚实</strong></div>
+      </div>
+      <a class="button-link" href={withBase('')}>查看所有文章 <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+</BaseLayout>

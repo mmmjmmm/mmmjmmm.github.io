@@ -1,0 +1,100 @@
+---
+import SearchDialog from '../components/SearchDialog.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { SITE } from '../config/site';
+import { withBase } from '../lib/urls';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  type?: 'website' | 'article';
+  publishedAt?: Date;
+  updatedAt?: Date;
+  searchable?: boolean;
+}
+
+const {
+  title = SITE.title,
+  description = SITE.description,
+  type = 'website',
+  publishedAt,
+  updatedAt,
+  searchable = false,
+} = Astro.props;
+const pageTitle = title === SITE.title ? title : `${title} · ${SITE.name}`;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const socialImageURL = new URL(withBase('og-default.svg'), Astro.site);
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': type === 'article' ? 'BlogPosting' : 'WebSite',
+  name: title,
+  headline: title,
+  description,
+  url: canonicalURL.toString(),
+  image: socialImageURL.toString(),
+  inLanguage: SITE.locale,
+  author: { '@type': 'Person', name: SITE.author },
+  ...(publishedAt ? { datePublished: publishedAt.toISOString() } : {}),
+  ...(updatedAt ? { dateModified: updatedAt.toISOString() } : {}),
+};
+---
+
+<!doctype html>
+<html lang={SITE.locale} data-pagefind-ignore={searchable ? undefined : true} class="no-js">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171416" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href={canonicalURL} />
+    <link rel="icon" href={withBase('favicon.svg')} type="image/svg+xml" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title={`${SITE.title} RSS`}
+      href={withBase('rss.xml')}
+    />
+    <title>{pageTitle}</title>
+
+    <meta property="og:type" content={type} />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content={SITE.title} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:image" content={socialImageURL} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImageURL} />
+    {publishedAt && <meta property="article:published_time" content={publishedAt.toISOString()} />}
+    {updatedAt && <meta property="article:modified_time" content={updatedAt.toISOString()} />}
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+    <script is:inline>
+      (() => {
+        document.documentElement.classList.remove('no-js');
+        try {
+          const stored = localStorage.getItem('theme');
+          const preferred = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.dataset.theme =
+            stored === 'dark' || stored === 'light' ? stored : preferred;
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <SiteHeader />
+    <main id="main-content">
+      <slot />
+    </main>
+    <SiteFooter />
+    <SearchDialog />
+  </body>
+</html>

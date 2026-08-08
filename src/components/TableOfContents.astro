@@ -1,0 +1,43 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+}
+
+const { headings } = Astro.props;
+const visibleHeadings = headings.filter(({ depth }) => depth === 2 || depth === 3);
+---
+
+{
+  visibleHeadings.length > 0 && (
+    <>
+      <div class="desktop-toc">
+        <nav class="toc" aria-label="本文目录">
+          <p class="toc__title">本文目录</p>
+          <ol>
+            {visibleHeadings.map(({ depth, slug, text }) => (
+              <li class:list={{ 'toc-depth-3': depth === 3 }}>
+                <a href={`#${slug}`}>{text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </div>
+      <details class="mobile-toc">
+        <summary>
+          本文目录 <span aria-hidden="true">＋</span>
+        </summary>
+        <nav class="toc" aria-label="本文目录">
+          <ol>
+            {visibleHeadings.map(({ depth, slug, text }) => (
+              <li class:list={{ 'toc-depth-3': depth === 3 }}>
+                <a href={`#${slug}`}>{text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </details>
+    </>
+  )
+}

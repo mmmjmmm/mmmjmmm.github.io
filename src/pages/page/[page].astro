@@ -1,0 +1,50 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+import Pagination from '../../components/Pagination.astro';
+import PostList from '../../components/PostList.astro';
+import { SITE } from '../../config/site';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { paginatePosts } from '../../lib/blog';
+import { getPublishedPosts } from '../../lib/posts';
+
+interface Props {
+  posts: CollectionEntry<'posts'>[];
+  currentPage: number;
+  totalPages: number;
+}
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  const totalPages = Math.ceil(posts.length / SITE.pageSize);
+
+  return Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => {
+    const currentPage = index + 2;
+    return {
+      params: { page: String(currentPage) },
+      props: {
+        posts: paginatePosts(posts, currentPage, SITE.pageSize).items,
+        currentPage,
+        totalPages,
+      },
+    };
+  });
+}
+
+const { posts, currentPage, totalPages } = Astro.props;
+---
+
+<BaseLayout
+  title={`文章归档 · 第 ${currentPage} 页`}
+  description={`浏览 ${SITE.title} 的第 ${currentPage} 页文章。`}
+>
+  <section class="page-hero shell page-hero--archive">
+    <p class="eyebrow">ARCHIVE / PAGE {String(currentPage).padStart(2, '0')}</p>
+    <h1>文章归档</h1>
+    <p>持续记录，慢慢积累。</p>
+  </section>
+  <section class="archive-section shell" aria-label={`第 ${currentPage} 页文章`}>
+    <PostList posts={posts} />
+    <Pagination currentPage={currentPage} totalPages={totalPages} />
+  </section>
+</BaseLayout>

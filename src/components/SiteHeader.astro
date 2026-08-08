@@ -1,0 +1,100 @@
+---
+import { SITE } from '../config/site';
+import { withBase } from '../lib/urls';
+
+const githubURL = import.meta.env.PUBLIC_GITHUB_URL;
+const pathname = Astro.url.pathname;
+const links = [
+  { href: withBase(''), label: '文章', match: ['/', '/page/'] },
+  { href: withBase('tags/'), label: '标签', match: ['/tags/'] },
+  { href: withBase('about/'), label: '关于', match: ['/about/'] },
+];
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const relativePath = pathname.startsWith(base) ? pathname.slice(base.length) || '/' : pathname;
+---
+
+<header class="site-header">
+  <div class="site-header__inner shell">
+    <a class="wordmark" href={withBase('')} aria-label={`${SITE.title}首页`}>
+      {SITE.name}
+    </a>
+
+    <nav class="main-nav" aria-label="主导航">
+      {
+        links.map(({ href, label, match }) => {
+          const active = match.some((prefix) =>
+            prefix === '/' ? relativePath === '/' : relativePath.startsWith(prefix),
+          );
+          return (
+            <a href={href} aria-current={active ? 'page' : undefined}>
+              {label}
+            </a>
+          );
+        })
+      }
+    </nav>
+
+    <div class="header-actions">
+      {
+        githubURL && (
+          <a
+            class="icon-action github-link"
+            href={githubURL}
+            rel="me noopener"
+            target="_blank"
+            aria-label="GitHub（新窗口打开）"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.18-3.37-1.18-.46-1.15-1.11-1.46-1.11-1.46-.9-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.33 1.08 2.9.83.09-.64.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.58 9.58 0 0 1 12 7.01c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86v2.57c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
+            </svg>
+          </a>
+        )
+      }
+      <button
+        class="text-action search-trigger"
+        type="button"
+        data-search-open
+        aria-haspopup="dialog"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <span>搜索</span>
+      </button>
+      <button
+        class="text-action theme-toggle"
+        type="button"
+        data-theme-toggle
+        aria-label="切换到深色模式"
+      >
+        <span class="theme-toggle__icon" aria-hidden="true">◐</span>
+        <span class="theme-toggle__label">主题</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<script>
+  const themeButton = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+
+  function syncThemeButton() {
+    if (!themeButton) return;
+    const dark = document.documentElement.dataset.theme === 'dark';
+    themeButton.setAttribute('aria-label', dark ? '切换到浅色模式' : '切换到深色模式');
+    themeButton.setAttribute('aria-pressed', String(dark));
+  }
+
+  themeButton?.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      // The selected theme still works for this page when storage is unavailable.
+    }
+    syncThemeButton();
+  });
+
+  syncThemeButton();
+</script>

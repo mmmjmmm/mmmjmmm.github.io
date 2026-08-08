@@ -1,0 +1,55 @@
+---
+import Pagination from '../components/Pagination.astro';
+import PostList from '../components/PostList.astro';
+import { SITE } from '../config/site';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { paginatePosts } from '../lib/blog';
+import { getPublishedPosts, getTagIndex } from '../lib/posts';
+import { withBase } from '../lib/urls';
+
+const posts = await getPublishedPosts();
+const tags = getTagIndex(posts);
+const page = paginatePosts(posts, 1, SITE.pageSize);
+---
+
+<BaseLayout>
+  <section class="hero shell" aria-labelledby="hero-title">
+    <div class="hero__main">
+      <p class="eyebrow">TECH NOTES · LEARNING LOG</p>
+      <h1 id="hero-title" aria-label="把复杂的技术，写成清楚的笔记。">
+        把复杂的技术，<br />写成清楚的笔记。
+      </h1>
+      <p class="hero__intro">记录开发实践、学习过程与问题排查。没有封面图，只有值得留下的内容。</p>
+      <a class="hero__cta" href="#latest-posts">开始阅读 <span aria-hidden="true">↓</span></a>
+    </div>
+    <aside class="hero__side" aria-label="博客概览">
+      <div class="orb orb--one" aria-hidden="true"></div>
+      <div class="orb orb--two" aria-hidden="true"></div>
+      <p class="hero-note">WRITE<br />LEARN<br />REPEAT</p>
+      <dl class="hero-stats">
+        <div>
+          <dt>文章</dt>
+          <dd>{String(posts.length).padStart(2, '0')}</dd>
+        </div>
+        <div>
+          <dt>标签</dt>
+          <dd>{String(tags.length).padStart(2, '0')}</dd>
+        </div>
+      </dl>
+    </aside>
+  </section>
+
+  <section class="archive-section shell" id="latest-posts" aria-labelledby="latest-heading">
+    <header class="section-heading">
+      <div>
+        <p class="eyebrow">ARCHIVE / {new Date().getFullYear()}</p>
+        <h2 id="latest-heading">最新文章</h2>
+      </div>
+      <a class="text-link" href={withBase('tags/')}
+        >浏览所有标签 <span aria-hidden="true">↗</span></a
+      >
+    </header>
+    <PostList posts={page.items} />
+    <Pagination currentPage={page.currentPage} totalPages={page.totalPages} />
+  </section>
+</BaseLayout>

@@ -1,0 +1,31 @@
+---
+import { withBase } from '../lib/urls';
+
+interface Props {
+  currentPage: number;
+  totalPages: number;
+}
+
+const { currentPage, totalPages } = Astro.props;
+const pageURL = (page: number) => withBase(page === 1 ? '' : `page/${page}/`);
+---
+
+{
+  totalPages > 1 && (
+    <nav class="pagination" aria-label="文章分页">
+      {currentPage > 1 ? (
+        <a href={pageURL(currentPage - 1)}>← 较新的文章</a>
+      ) : (
+        <span aria-hidden="true" />
+      )}
+      <span>
+        {String(currentPage).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+      </span>
+      {currentPage < totalPages ? (
+        <a href={pageURL(currentPage + 1)}>更早的文章 →</a>
+      ) : (
+        <span aria-hidden="true" />
+      )}
+    </nav>
+  )
+}
