@@ -4,42 +4,35 @@ import PostList from '../components/PostList.astro';
 import { SITE } from '../config/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { paginatePosts } from '../lib/blog';
-import { getPublishedPosts, getTagIndex } from '../lib/posts';
+import { getPublishedPosts } from '../lib/posts';
 import { withBase } from '../lib/urls';
 
 const posts = await getPublishedPosts();
-const tags = getTagIndex(posts);
 const page = paginatePosts(posts, 1, SITE.pageSize);
 ---
 
 <BaseLayout>
-  <section class="hero shell" aria-labelledby="hero-title">
-    <div class="hero__main">
-      <p class="eyebrow">TECH NOTES · LEARNING LOG</p>
-      <h1 id="hero-title" aria-label="把复杂的技术，写成清楚的笔记。">
-        把复杂的技术，<br />写成清楚的笔记。
-      </h1>
-      <p class="hero__intro">记录开发实践、学习过程与问题排查。没有封面图，只有值得留下的内容。</p>
-      <a class="hero__cta" href="#latest-posts">开始阅读 <span aria-hidden="true">↓</span></a>
-    </div>
-    <aside class="hero__side" aria-label="博客概览">
-      <div class="orb orb--one" aria-hidden="true"></div>
-      <div class="orb orb--two" aria-hidden="true"></div>
-      <p class="hero-note">WRITE<br />LEARN<br />REPEAT</p>
-      <dl class="hero-stats">
-        <div>
-          <dt>文章</dt>
-          <dd>{String(posts.length).padStart(2, '0')}</dd>
-        </div>
-        <div>
-          <dt>标签</dt>
-          <dd>{String(tags.length).padStart(2, '0')}</dd>
-        </div>
-      </dl>
-    </aside>
+  <h1 class="visually-hidden">{SITE.title}</h1>
+  <section
+    class="reading-gate shell"
+    aria-label="阅读入口"
+    data-reading-gate
+    data-scroll-state="idle"
+  >
+    <a class="reading-gate__cta" href="#latest-posts" data-reading-start>
+      <span>mjm's blog</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v17m0 0 6-6m-6 6-6-6"></path>
+      </svg>
+    </a>
   </section>
 
-  <section class="archive-section shell" id="latest-posts" aria-labelledby="latest-heading">
+  <section
+    class="archive-section shell"
+    id="latest-posts"
+    aria-labelledby="latest-heading"
+    data-scroll-state="idle"
+  >
     <header class="section-heading">
       <div>
         <p class="eyebrow">ARCHIVE / {new Date().getFullYear()}</p>
@@ -53,3 +46,32 @@ const page = paginatePosts(posts, 1, SITE.pageSize);
     <Pagination currentPage={page.currentPage} totalPages={page.totalPages} />
   </section>
 </BaseLayout>
+
+<script>
+  const readingGate = document.querySelector<HTMLElement>('[data-reading-gate]');
+  const startReading = document.querySelector<HTMLAnchorElement>('[data-reading-start]');
+  const articleArchive = document.querySelector<HTMLElement>('#latest-posts');
+
+  startReading?.addEventListener('click', (event) => {
+    if (!readingGate || !articleArchive) return;
+
+    event.preventDefault();
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    readingGate.dataset.scrollState = 'departing';
+    articleArchive.dataset.scrollState = reduceMotion ? 'arrived' : 'arriving';
+    articleArchive.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+
+    if (reduceMotion) {
+      readingGate.dataset.scrollState = 'idle';
+      window.history.replaceState(null, '', '#latest-posts');
+      return;
+    }
+
+    window.setTimeout(() => {
+      readingGate.dataset.scrollState = 'idle';
+      articleArchive.dataset.scrollState = 'arrived';
+      window.history.replaceState(null, '', '#latest-posts');
+    }, 420);
+  });
+</script>

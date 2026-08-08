@@ -3,7 +3,7 @@ import { render, type CollectionEntry } from 'astro:content';
 
 import TableOfContents from '../../components/TableOfContents.astro';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { findRelatedPosts, formatDate, tagSlug } from '../../lib/blog';
+import { formatDate, tagSlug } from '../../lib/blog';
 import { getPublishedPosts, getReadingTime } from '../../lib/posts';
 import { withBase } from '../../lib/urls';
 
@@ -22,10 +22,7 @@ const posts = await getPublishedPosts();
 const currentIndex = posts.findIndex(({ id }) => id === post.id);
 const newerPost = currentIndex > 0 ? posts[currentIndex - 1] : undefined;
 const olderPost = currentIndex >= 0 ? posts[currentIndex + 1] : undefined;
-const relatedPosts = findRelatedPosts(post, posts);
 const readingTime = getReadingTime(post);
-const typeLabel = post.data.type === 'article' ? '技术文章' : '学习笔记';
-const typeCode = post.data.type === 'article' ? 'ARTICLE' : 'NOTE';
 ---
 
 <BaseLayout
@@ -44,7 +41,6 @@ const typeCode = post.data.type === 'article' ? 'ARTICLE' : 'NOTE';
     </nav>
 
     <header class="article-header">
-      <p class="eyebrow">{typeCode} / {typeLabel}</p>
       <h1 data-pagefind-meta="title">{post.data.title}</h1>
       <p class="article-header__description" data-pagefind-meta="description">
         {post.data.description}
@@ -110,28 +106,6 @@ const typeCode = post.data.type === 'article' ? 'ARTICLE' : 'NOTE';
         )
       }
     </nav>
-
-    {
-      relatedPosts.length > 0 && (
-        <section class="related-posts" aria-labelledby="related-heading" data-pagefind-ignore>
-          <header>
-            <p class="eyebrow">KEEP READING</p>
-            <h2 id="related-heading">相关文章</h2>
-          </header>
-          <div>
-            {relatedPosts.map((related) => (
-              <a href={withBase(`posts/${related.id}/`)}>
-                <span>{related.data.type === 'article' ? '技术文章' : '学习笔记'}</span>
-                <strong>{related.data.title}</strong>
-                <small>
-                  {formatDate(related.data.publishedAt)} · {getReadingTime(related)} 分钟
-                </small>
-              </a>
-            ))}
-          </div>
-        </section>
-      )
-    }
   </article>
 </BaseLayout>
 
