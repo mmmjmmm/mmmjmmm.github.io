@@ -1,4 +1,12 @@
-# 面试2
+---
+title: 面试2
+publishedAt: 2026-08-08
+type: note
+tags:
+  - 面试
+  - AI Agent
+draft: false
+---
 
 ## 贯穿项目的核心观点
 
@@ -192,7 +200,7 @@ Token 是模型处理文本的基本计量单位，输入和输出都会消耗 t
 
 判断原则是：LLM 负责语义决策，程序负责确定性约束。工具失败如果是网络抖动、临时超时、外部服务偶发错误，应该在工具层按 max\_retries 重试。重试后仍失败，但任务还有替代路径，比如搜索失败可以换关键词、文件找不到可以让 ReAct 重新选择路径，这可以交给 Agent 根据工具结果继续推理。若失败是确定性错误，比如工具不存在、权限未授权、DAG 不合法、依赖失败、超过超时或重试上限，就不应该让模型无限尝试，而应该由 Runtime 标记 failed、skipped 或返回 ErrorEvent。Team 模式里 Worker 失败会任务级重试，耗尽后失败传播到依赖节点，最后由 Synthesizer 汇总失败原因。
 
-## 
+##
 
 # 三、DAG、多 Agent、并发与调度拷打
 
@@ -257,8 +265,6 @@ at\-most\-once 是最多执行一次，可能丢任务，但不会重复。at\-l
 ## 15\. 怎么避免一个因为网络超时实际上已经成功的 Tool 被重复执行？
 
 当前项目还没有完整实现这一层。正确做法是：对有副作用的工具引入 idempotency key，例如 tool\_call\_id、task\_id、attempt 组合；外部工具服务按这个 key 做去重；写文件时可以写临时文件再原子 rename；提交类操作先查询状态再决定是否重试；对非幂等工具默认不自动重试或要求人工确认。在当前实现里，工具层会按 max\_retries 重试，所以读操作问题不大，但写文件、Shell、浏览器提交这类副作用操作，严格 exactly\-once 还需要进一步补幂等设计。
-
-
 
 # 四、Docker 沙箱和工具系统
 
@@ -777,4 +783,3 @@ noVNC 是一个运行在浏览器里的 VNC 客户端，本质是用 HTML5 Canva
 Docker 沙箱里跑了虚拟桌面链路：`Xvfb` 提供虚拟显示器，Chromium 在这个显示器里运行，`x11vnc` 把显示器内容暴露成 VNC，`websockify` 再把 VNC 转成 WebSocket。后端的 `/api/sessions/{session_id}/vnc` WebSocket 端点会连接沙箱的 `ws://容器IP:5901`，并在浏览器和沙箱之间双向转发字节。
 
 所以浏览器看到的不是 Docker 本身，而是容器里虚拟显示器的帧缓冲画面；用户鼠标键盘事件通过 noVNC 发回后端，再转到沙箱里的 VNC 服务，最终作用到容器里的 Chromium。这也是为什么 noVNC 需要 WebSocket：它是双向、低延迟、二进制交互流，不适合用 SSE。
-
