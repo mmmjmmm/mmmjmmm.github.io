@@ -104,7 +104,7 @@ export function collectTags<T extends BlogPostLike>(posts: readonly T[]) {
   );
 }
 
-export function estimateReadingTime(markdown: string, charactersPerMinute = 500) {
+function getContentMetrics(markdown: string) {
   const plainText = markdown
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
@@ -118,6 +118,16 @@ export function estimateReadingTime(markdown: string, charactersPerMinute = 500)
       .replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, ' ')
       .match(/[\p{Letter}\p{Number}]+(?:['’-][\p{Letter}\p{Number}]+)*/gu)?.length ?? 0;
 
+  return { cjkCharacters, latinWords };
+}
+
+export function countWords(markdown: string) {
+  const { cjkCharacters, latinWords } = getContentMetrics(markdown);
+  return cjkCharacters + latinWords;
+}
+
+export function estimateReadingTime(markdown: string, charactersPerMinute = 500) {
+  const { cjkCharacters, latinWords } = getContentMetrics(markdown);
   return Math.max(1, Math.ceil((cjkCharacters + latinWords * 2) / charactersPerMinute));
 }
 

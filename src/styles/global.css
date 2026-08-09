@@ -819,7 +819,7 @@ html[data-theme='dark'] .theme-toggle__icon {
   max-width: 900px;
   margin-bottom: 20px;
   font-family: var(--display);
-  font-size: clamp(2.35rem, 4vw, 3.5rem);
+  font-size: clamp(2rem, 3vw, 2.25rem);
   font-weight: 500;
   letter-spacing: -0.045em;
   line-height: 1.05;
@@ -857,9 +857,15 @@ html[data-theme='dark'] .theme-toggle__icon {
 .article-sidebar {
   position: sticky;
   top: 32px;
+  max-height: calc(100dvh - 64px);
   min-width: 0;
   margin-bottom: 0;
+  padding-right: 10px;
+  overflow-y: auto;
   align-self: start;
+  overscroll-behavior-y: contain;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
 }
 
 .mobile-toc {
@@ -941,22 +947,22 @@ html[data-theme='dark'] .theme-toggle__icon {
 }
 
 .prose h2 {
-  margin-top: 3.4em;
-  margin-bottom: 0.8em;
-  font-size: clamp(2rem, 3.4vw, 2.8rem);
+  margin-top: 1.6rem;
+  margin-bottom: 0.65rem;
+  font-size: clamp(1.5rem, 2.2vw, 1.75rem);
 }
 
 .prose h3 {
-  margin-top: 2.7em;
-  margin-bottom: 0.75em;
-  font-size: 1.65rem;
+  margin-top: 1.4rem;
+  margin-bottom: 0.6rem;
+  font-size: 1.25rem;
 }
 
 .prose h4 {
-  margin-top: 2.2em;
-  margin-bottom: 0.7em;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
   font-family: var(--sans);
-  font-size: 1.15rem;
+  font-size: 1.0625rem;
 }
 
 .prose p,
@@ -965,7 +971,7 @@ html[data-theme='dark'] .theme-toggle__icon {
 .prose blockquote,
 .prose table,
 .prose pre {
-  margin-bottom: 1.65em;
+  margin-bottom: 1.1em;
 }
 
 .prose :where(ul, ol) {
@@ -1476,7 +1482,11 @@ kbd {
 
   .article-sidebar {
     position: static;
+    max-height: none;
     margin-bottom: 36px;
+    padding-right: 0;
+    overflow: visible;
+    overscroll-behavior: auto;
   }
 
   .desktop-toc {
@@ -1520,8 +1530,11 @@ kbd {
 
   .mobile-toc .toc {
     position: static;
+    max-height: min(60dvh, 520px);
     padding: 0 18px 18px;
+    overflow-y: auto;
     border-top: 1px solid var(--border);
+    overscroll-behavior-y: contain;
   }
 
   .mobile-toc .toc ol {
@@ -1644,7 +1657,7 @@ kbd {
   }
 
   .prose h2 {
-    margin-top: 2.7em;
+    margin-top: 1.5rem;
   }
 
   .prose pre {

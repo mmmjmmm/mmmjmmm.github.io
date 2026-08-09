@@ -5,7 +5,7 @@ import TableOfContents from '../../components/TableOfContents.astro';
 import { SITE } from '../../config/site';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { formatDate, tagSlug } from '../../lib/blog';
-import { getPublishedPosts, getReadingTime } from '../../lib/posts';
+import { getPublishedPosts, getReadingTime, getWordCount } from '../../lib/posts';
 import { withBase } from '../../lib/urls';
 
 interface Props {
@@ -23,6 +23,7 @@ const posts = await getPublishedPosts();
 const currentIndex = posts.findIndex(({ id }) => id === post.id);
 const newerPost = currentIndex > 0 ? posts[currentIndex - 1] : undefined;
 const olderPost = currentIndex >= 0 ? posts[currentIndex + 1] : undefined;
+const wordCount = getWordCount(post);
 const readingTime = getReadingTime(post);
 ---
 
@@ -52,9 +53,11 @@ const readingTime = getReadingTime(post);
       }
       <div class="article-header__footer">
         <div class="article-meta">
-          <time datetime={post.data.publishedAt.toISOString()}
-            >{formatDate(post.data.publishedAt)}</time
-          >
+          <time datetime={post.data.publishedAt.toISOString()}>
+            {formatDate(post.data.publishedAt)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span>{wordCount.toLocaleString('zh-CN')} 字</span>
           <span aria-hidden="true">·</span>
           <span>{readingTime} 分钟阅读</span>
           {
