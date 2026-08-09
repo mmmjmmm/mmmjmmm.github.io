@@ -1,0 +1,48 @@
+edition: 3.0.0
+name: mjm-blog-admin
+access: default
+
+vars:
+  region: cn-hangzhou
+
+resources:
+  blogAdmin:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: mjm-blog-admin
+      description: mjm's blog private writing admin
+      runtime: custom.debian12
+      code: ./.fc-build
+      memorySize: 512
+      timeout: 60
+      customRuntimeConfig:
+        port: 9000
+        command:
+          - /var/fc/lang/nodejs20/bin/node
+        args:
+          - dist/server/server/index.js
+      environmentVariables:
+        NODE_ENV: production
+        PORT: '9000'
+        ADMIN_USERNAME: ${env('ADMIN_USERNAME')}
+        ADMIN_PASSWORD_HASH: ${env('ADMIN_PASSWORD_HASH')}
+        SESSION_SECRET: ${env('SESSION_SECRET')}
+        GITHUB_TOKEN: ${env('GITHUB_TOKEN')}
+        GITHUB_OWNER: mmmjmmm
+        GITHUB_REPO: mmmjmmm.github.io
+        GITHUB_MAIN_BRANCH: main
+        GITHUB_DRAFT_BRANCH: drafts
+        PUBLIC_SITE_URL: https://mmmjmmm.github.io
+      triggers:
+        - triggerName: public-http
+          triggerType: http
+          triggerConfig:
+            authType: anonymous
+            disableURLInternet: false
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - HEAD
