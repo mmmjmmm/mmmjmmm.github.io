@@ -1895,15 +1895,332 @@ sse_info → 本地 39998 → get_greet_sse 继续补流
 
 ## 8. SSE 高频更新为什么容易造成 React 高频渲染？你会怎么优化？
 
+SSE 的问题在于，服务端会不断推送 chunk。假设一句回答拆成几百个 chunk，如果每收到一个 chunk 都立刻 setState，就会不断给 React 调度更新。每次更新都会进入 Fiber 的 Render 阶段，重新计算受影响组件的 Fiber、执行组件函数和 diff；有实际 DOM 变化时再进入 Commit 阶段更新宿主视图。**React 18 虽然有自动批处理，但 SSE chunk 是跨时间不断到达的，不是所有 chunk 都处在同一次同步事件里，所以不能指望 React 自动把整个流合成一次更新。**
+
+而且 AI 聊天页面的成本通常不仅是“改几个字”。一条消息变化可能带动消息列表重新 render、Markdown 重新解析、卡片重新计算、自动滚动、布局计算，甚至图片和引用组件的状态变化。因此真正的问题是：模型可能每几毫秒产生一次数据，但屏幕根本没必要以这个频率刷新。
+
+我的优化思路主要有三层。
+
+第一层是降低 `setState` 的频率，不要一个 chunk 更新一次 React state。SSE callback 收到数据以后，先写到一个 buffer，比如 `useRef` 中，因为修改 ref 不会触发 render；然后通过 `requestAnimationFrame` 每帧最多提交一次，或者每 30～50ms 批量提交一次。这样可能 10 个 SSE chunk 最终只触发 1 次 React 更新。
+
+例如：
+
+```js
+const bufferRef = useRef('');
+const rafRef = useRef(null);
+
+function onChunk(chunk) {
+  bufferRef.current += chunk;
+
+  if (rafRef.current) return;
+
+  rafRef.current = requestAnimationFrame(() => {
+    const text = bufferRef.current;
+    bufferRef.current = '';
+
+    setContent((prev) => prev + text);
+
+    rafRef.current = null;
+  });
+}
+```
+
+这里的核心不是 `requestAnimationFrame` 本身，而是把“网络事件频率”和“UI 更新频率”解耦。SSE 可以每 5ms 来一次，但 React 最多按照屏幕刷新节奏提交，比如一帧一次。
+
+第二层是缩小更新影响范围。不要把当前流式文本存在整个会话列表最顶层，然后每来一个 chunk 都重新生成整个 messages 数组，导致整个 `MessageList` 重新参与 render。
+
+更合理的是把“正在流式生成的内容”尽量下沉到当前消息组件，例如当前正在生成的是 message C，就只让 C 的局部 state 更新。历史消息 A、B 本身没有变化，就尽量保持 props 引用稳定，再配合 `React.memo` 避免它们跟着重新执行。
+
+所以可以理解成：
+
+```
+SSE 数据到达 → 当前消息局部 buffer → 批量提交当前消息 → 历史消息不动。
+```
+
+而不是：
+
+```
+SSE 数据到达 → 重建整个 messages → MessageList 全量更新 → 所有 MessageCard 都重新参与 render。
+```
+
+第三层才是 React.memo / useMemo / useCallback 这些 React 层优化。它们有用，但优先级其实低于前两个。先减少更新次数、缩小更新范围，再做 memo。
+
 ### 8.1 React.memo、useMemo、useCallback 分别有什么作用？
+
+1. React.memo 是干什么的？
+
+它是组件级优化。如果父组件重新 render，但某个子组件的新旧 props 浅比较没有变化，React 可以跳过这个子组件的函数执行。
+
+例如历史消息：
+
+```js
+const MessageItem = React.memo(function MessageItem({ message }) {
+  return <MessageCard message={message} />;
+});
+```
+
+如果我更新的是最后一条流式消息，而前面的 message 对象引用都保持不变，那么历史 MessageItem 就可以 bailout。
+
+但如果你每次 SSE 更新都这样：
+
+```js
+setMessages((prev) => prev.map((item) => ({ ...item })));
+```
+
+那所有 message 对象引用都变了。
+
+即使内容没变：
+
+```js
+oldMessage !== newMessage;
+```
+
+React.memo 的浅比较还是会认为 props 变化，因此优化基本失效。
+
+所以在消息列表场景里，保持未变化消息的对象引用稳定非常重要。
+
+2. useMemo 是干什么的？
+
+它缓存的是一个计算结果。
+
+例如 Markdown 解析、复杂卡片数据转换很耗时：
+
+```
+const parsedContent = useMemo(
+  () => parseMarkdown(message.content),
+  [message.content]
+);
+```
+
+只要 message.content 不变，就不用重复执行这个昂贵计算。
+
+它解决的是：“组件已经 render 了，但某个计算没必要重新算。”
+
+它不是用来阻止组件 render 的。
+
+3. useCallback 是干什么的？
+
+它缓存的是函数引用。
+
+比如：
+
+```js
+const handleRetry = useCallback(() => {
+  retryMessage(message.id);
+}, [message.id]);
+```
+
+如果你直接：
+
+```js
+<MessageItem onRetry={() => retryMessage(message.id)} />
+```
+
+父组件每次 render 都会创建一个新函数，所以：
+
+```js
+oldOnRetry !== newOnRetry;
+```
+
+即使 MessageItem 被 React.memo 包住，也可能因为函数 props 变化导致 memo 失效。
+
+所以 `useCallback` 本身通常不是为了“函数创建很耗性能”，而是为了保持传给 memo 子组件的函数引用稳定。
 
 ### 8.2 为什么它们解决不了消息 key 不稳定的问题？
 
+“既然用了 React.memo，为什么还解决不了 message key 不稳定？”
+
+因为这是两个完全不同层面的问题。
+
+React.memo 解决的是：同一个 Fiber 对应的组件，要不要重新执行 render。
+
+而 key 解决的是：React 认为前后两次到底是不是同一个 Fiber。
+
+假设第一次：
+
+```js
+<Message key="fake_123" />
+```
+
+后来 SSE 假消息切 IM 真消息，变成：
+
+```js
+<Message key="server_456" />
+```
+
+即使它们业务上是同一条消息，React 看到 key 变了，会认为：旧的 fake_123 消失了，新的 server_456 出现了。
+
+于是旧组件卸载，新组件重新挂载。
+
+这时候 React.memo 根本没有发挥空间，因为 React 都不认为这是同一个组件实例了。
+
+这也是为什么 SSE 假消息 → IM 真消息的时候，消息身份对齐和稳定 key 非常重要。
+
 ### 8.3 为什么不能用数组下标作为 message key？
+
+因为聊天列表会插入、删除、假消息切真消息，位置会变化。
+
+假设最开始：
+
+```
+A 的 index 是 0
+B 的 index 是 1
+C 的 index 是 2
+```
+
+如果中间插入一条 X：
+
+```
+A 还是 0
+X 变成 1
+B 变成 2
+C 变成 3
+```
+
+如果用 index 当 key，那么原来 key=1 对应 B，现在却对应 X。React 会误以为：
+
+“原来的那个组件还在，只是 props 变成 X 了。”
+
+这样就可能导致组件内部 state、打字机状态、展开状态等跟错误消息绑定。
+
+聊天场景尤其危险，因为 `MessageCard` 往往不是纯静态组件，里面可能有打字动画、图片加载状态、展开状态、反馈状态。
+
+所以 message key 应该优先使用稳定的消息身份，例如 `serverId / FrontMsgId / MessageId`，核心原则就是：
+
+同一条逻辑消息生命周期内 key 尽量不变，不同消息 key 一定不同。
+
+> 如果 key 变了，是销毁重建；如果 key 没变但对应的数据变了，React 会复用原组件，这才会“错配”。
 
 ### 8.4 SSE callback 为什么容易出现闭包旧状态？
 
+最常见的解决办法是函数式更新：
+
+setContent(prev => prev + event.data);
+
+因为这里不再依赖 callback 闭包里捕获的 content，React 会把当前最新 state 传给 prev。
+
+如果 callback 里需要读取很多最新状态，但又不希望不断销毁、重建 SSE listener，也可以维护 ref：
+
+const stateRef = useRef(state);
+
+useEffect(() => {
+stateRef.current = state;
+}, [state]);
+
+然后长生命周期 SSE callback 中读取 stateRef.current。
+
 ## 9. 图片跟随 SSE 流式消息渲染时，为什么容易闪烁、重复加载或者顺序变化？你具体怎么保证单图、多图稳定展示？
+
+AI 回答不是一次性拿到完整的“文本 + 图片”，而是同一条 39998 消息不断收到 replace / append / new。文本可能先来，图片的 custom_view_list 后来；后续又继续来文本或者其他 custom view。因此一条消息对象会被反复更新。项目里图片本质上也是 SSE 消息 ext 中的 a:custom_view_list，不是独立的图片消息。
+
+所以第一个风险是图片闪一下又没了。假设某次 SSE 数据里已经有图片 A，下一次 SSE replace 只带了新的文本，没有重新携带 A。如果前端像普通字段一样直接：
+
+```
+newExt = {
+  ...oldExt,
+  ...incomingExt
+}
+```
+
+或者直接拿新的 custom_view_list 覆盖旧值，就可能把前一个 chunk 已经收到的图片信息覆盖掉。
+
+你们首屏 `SseMessageRecord.replaceMsg` 对 `CustomViewList` 是特殊处理的：不是简单覆盖，而是把之前的和这次新下发的列表累加起来。也就是说，图片一旦随着流式消息进来了，后续只更新文本时不会把它弄丢。
+
+所以这一点你可以说：
+
+**“SSE 是增量协议，图片 ext 不能按照普通字段 last-write-wins，否则后续文本 chunk 可能把已经出现的图片覆盖掉，所以我们对 custom_view_list 做累计合并。”**
+
+**第二个风险是图片组件不断卸载重建，从而闪烁或者重新请求 URL。**
+
+这个和我们刚才讲的 React key 是一回事。SSE 每来一次，SseQaCard 都可能重新 render。如果同一张图片第一次的 key 是 A，下一次变成 B，React 会认为不是同一个节点，就会把原 Image 卸载，再挂一个新的 Image。图片组件重新挂载以后，就可能重新进入加载过程，于是用户看到图片闪一下或者重新加载。
+
+你们这里**图片协议本身有稳定 ID**。Markdown 里面不是直接塞 URL，而是有类似 `blockview://multi-image-xxx` 的占位符，同时 `custom_view_list` 中有相同 id 的 item；渲染时自定义 view 使用 `id={item.id}`，让 Markdown 占位符和真实图片组件稳定关联。
+
+多图内部更明确：
+
+```js
+{
+  visibleImageList.map((image) => (
+    <view key={image.id}>
+      <Image src={image.src} />
+    </view>
+  ));
+}
+```
+
+也就是说，同一张图片只要服务端 `image.id` 不变，ReactLynx 就可以识别这是之前那张图片，而不是新的图片节点。
+
+**“图片稳定不仅依赖 URL，还依赖稳定的业务 ID。外层 custom view 用 item.id 和 Markdown blockview 对齐，多图内部用 image.id 作为 key，避免 SSE 更新时因为节点身份变化导致图片重新挂载。”**
+
+第三个风险是多图顺序跳动。
+
+假设这次收到：A、B
+
+下一次收到：B、A、C
+
+那即使三张图片完全一样，页面也会发生位置变化。
+
+这个项目里图片顺序主要不是前端排序出来的，而是服务端协议已经确定顺序。PRD 定义的是优先按照 doc 中穴位名首次出现顺序；如果 doc 没有而 query 中有，则按照 query 出现顺序。前端拿到 image_list 后保持服务端数组顺序，只做：
+
+```js
+const visibleImageList = imageList.slice(0, 3);
+```
+
+也就是不重新 sort，只取前 3 张。
+
+因此顺序稳定的核心其实是：**服务端生成稳定顺序 + 前端不二次排序 + image.id 保持节点身份。**
+
+单图协议就是 type="image"，item.src 作为图片 URL，item.id 同时承担 blockview 对齐和图片身份。图片按照固定比例展示，点击以后把 [item.src] 传给 tt.previewImage。
+
+多图协议是 type="multi_image"，里面有一个有序 image_list。前端首先判断它是不是真数组，而且为空就直接 return null，防止异常协议把整张 SSE 卡片搞崩；正常情况下只展示前 3 张，超过 3 张显示总数量。每张图片使用自己的 image.id 作为 key。
+
+预览的时候却不是只把前三张传进去，而是：image_url_list = 完整 image_list
+
+然后点击第二张时：current = 第二张 URL
+
+因此页面只展示前三张，但进入预览以后可以继续左右滑看到所有图片。
+
+还有两个小的稳定性处理也可以作为追问讲。
+
+一个是异常数据兜底。 `custom_view_list` 是服务端 ext JSON，`image_list` 不一定百分百符合预期，所以不能直接 .map()，而是：
+
+```js
+const imageList = Array.isArray(item.image_list) ? item.image_list : [];
+
+if (imageList.length === 0) {
+  return null;
+}
+```
+
+这样某个多图模块协议异常，最多不展示这个模块，不至于把整张 AI 回答卡片 render 崩。
+
+另一个是图片点击用了 1000ms 防抖，避免连续点击多次拉起预览器、重复上报点击。
+
+但是“重复图片”这里你要特别注意。
+
+你们当前首屏 `replaceMsg` 对 `custom_view_list` 的代码实际上是：
+
+```js
+[...oldCustomViewList, ...newCustomViewList];
+```
+
+也就是追加，不是按 ID 去重。
+
+所以如果面试官追问：
+
+“如果服务端同一个 image/custom view 重复下发怎么办？”
+
+“当前链路的核心前提还是服务端 custom view ID 和图片 ID 稳定，前端现有实现通过累计 custom_view_list 防止流式 replace 把已有图片覆盖掉，多图渲染则使用 image.id 保证 React 节点稳定。现有项目资料里没有看到一层通用的 custom view 去重；如果要进一步做健壮性，我会在累计时按 item.id 建 Map，相同 ID 做 merge/replace，新 ID 才 append，从协议层避免重复图片进入渲染列表。”
+
+这个就属于通用改进方案，不要冒充现有实现。
+
+### 总结
+
+“图片跟随 SSE 最麻烦的是，同一条消息会不断 replace/append，文本和图片还可能不是同一个 chunk 到。如果每次直接覆盖 ext，后续文本更新可能把已经收到的图片覆盖掉；如果图片 ID 或 React key 不稳定，又会导致 Image 被卸载重挂，引发闪烁和重复加载；多图数组顺序变化还会造成图片跳位。
+
+我们这里图片通过 custom_view_list 下发，首屏 SSE 合并时对这个字段做累计而不是简单覆盖，所以已经出现的图片不会被后续 chunk 丢掉。Markdown 里用 blockview ID 和 custom view 的 item.id 做位置映射，多图内部用稳定的 image.id 做 key。多图顺序由服务端按穴位在 doc/query 中的出现顺序确定，前端保持 image_list 原顺序，只取前 3 张展示，完整数组用于预览。另外对 image_list 做了类型和空数组兜底，避免异常协议导致整卡崩溃。”
+
+**“所以稳定渲染主要解决四件事：流式更新不能丢图、同一张图身份不能变、多图顺序不能乱、异常图片数据不能拖垮整张消息卡。”**
 
 # 四、Agent / 协议 / 全栈：AI 全栈面试很容易扩展
 
@@ -1915,3 +2232,47 @@ sse_info → 本地 39998 → get_greet_sse 继续补流
 > 信息透传是什么？
 > 为什么多个入口最后必须收敛到统一发送出口？
 > 不收敛会产生什么竞态和重复发送问题？
+
+首先，所谓“扩展服务端插件协议”，并不是重新设计了一套完全独立的健康服务卡片协议，而是在原有 `ActionBar` 插件体系旁边新增了独立的 `health_service_plugins`。原来页面底部已经存在 `action_bar_plugins`，健康服务继续复用了它已有的 `description`、`icon`、`status`、`msg_content` 等字段和 `ActionBar` 渲染能力，但是给健康服务单独增加了业务身份和上下文，例如 `name=health_service_agent、sub_title、ext_params`。所以它既能复用现有插件基础设施，又不会把健康服务的策略、埋点和业务语义混进普通 `ActionBar`。
+
+为什么不直接让前端写一个 `type=health_service_agent`，然后根据 type 把卡片内容写死？核心原因是健康服务属于“服务端需求推理和策略召回结果”，而不是一个固定前端功能。用户搜索“怎么减肥”时，服务端可能判断他的深层需求是运动计划、饮食计划或者热量管理；同一个 query 在不同 AB 实验和策略版本下，也可能召回不同内容甚至完全不召回。如果前端把“减脂计划”“睡眠计划”“饮食计划”分别写死，那每增加一种健康服务都要增加枚举、文案、点击行为并重新发版，实际上把本来应该快速迭代的服务端策略固化到了客户端。
+
+因此这个协议更合理的边界是：服务端决定“给这个用户什么服务”，前端只负责“按照协议把它展示出来”。比如页面上可以显示“帮你制定减脂计划”，但用户点击以后真正发送给模型的内容不一定就是这几个字，而是服务端下发的 msg_content。也就是说，服务端不仅决定展示内容，还决定这个按钮对应的实际模型输入，前端没有必要知道这是减脂、睡眠还是孕期饮食，只要按照统一的插件协议消费即可。
+
+这也解释了前端的“可扩展渲染”是怎么做的。健康服务并没有重新做一个和 ActionBar 平行的完整 UI 体系，而是直接复用已有 ActionBar，只是 BottomPlugin 根据状态选择传给它哪份 barList。如果当前应该展示健康服务，就把 `health_service_plugins` 交给 ActionBar；否则把普通 action_bar_plugins 交给它，因此原有的布局、滚动、曝光、点击防抖、键盘规避等能力都不需要再实现一次。
+
+所以如果未来新增一个“睡眠改善计划”，并且它仍然属于同样的 ActionBar 交互形式，那么前端原则上不需要新增“SleepPlanComponent”，服务端直接在 `health_service_plugins` 里下发新的 `description`、`msg_content` 和 `ext_params` 即可。只有当未来出现一种完全不同的视觉或者交互形态时，前端才需要增加新的 renderer，但这仍然只是扩展渲染层，不应该重新复制一套 SSE、IM、消息 merge 和发送链路。这个项目里 33333 通用 SSE 卡片的 node_type 机制也是类似思想，例如健康服务相关提示增加了 node type 48 的 CalloutComponent，扩展的是节点 renderer，而不是修改整个 SSE 主流程。
+
+接下来是健康服务 Agent 和普通插件为什么互斥。这个不能只回答“页面放不下”，真正原因是两者的业务生命周期不一样。健康服务 Agent 是首屏承接能力，目标是用户从 Top1 进入小程序以后、还没有真正开口聊天的时候，通过“生成减脂计划”“制定饮食方案”这种更明确的服务降低用户开口成本；普通 ActionBar 则属于常规会话阶段的功能入口。因此用户一旦已经发出第一条消息，健康服务作为“首次开口诱因”的使命就结束了，再继续挂着会干扰正常会话。PRD 本身也是希望健康服务单次会话只展示一次，用户互动后隐藏。
+
+前端具体就是通过 `userSended` 和 `enter_position` 来控制。用户还没发消息，并且当前进入场景不是禁止展示健康服务的场景时，如果服务端又确实下发了 `health_service_plugins`，就优先展示健康服务 ActionBar；否则展示常规 `action_bar_plugins`。因此它们不是两个区域一起堆在底部，而是同一个 BottomPlugin 插槽里的两种模式。
+
+互斥还有一个很重要的实验原因。健康服务本质是在验证一种新的“开口理由”，而原来的 RS、ActionBar 等本来就在争夺用户点击。如果健康服务和普通入口同时大量展示，你最终看到健康服务 CTR 很高，也不能说明它真正带来了新增对话，因为它可能只是从已有入口抢走了点击。你前面这个项目的数据也已经证明新增入口经常存在替换关系，所以前端至少要保证展示条件和埋点语义清晰，否则实验数据会很难归因。
+
+然后是“信息透传”到底是什么。用户在页面上看到的是一个普通按钮，但服务端生成这个按钮的时候，实际上可能已经附带了很多策略上下文，比如它属于哪个健康计划、哪个召回策略、哪个实验组以及后续模型应该如何处理。因此用户点击以后，前端不能只发送页面上看到的文字，而是需要把服务端下发的 `msg_content` 和 `ext_params` 一起放到这条用户消息里，同时前端再补一个 `ActionBarId=health_service_agent`，标记这条消息具体来自哪个入口。
+
+所谓“透传”的重点就是，前端不需要理解这些业务参数，更不应该自己重新生成它们，而是服务端第一次把上下文下发给前端，用户点击后前端再原样带回消息链路。这样模型或者后端收到消息以后，就能区分“用户手动输入了一句生成减脂计划”和“用户点击了服务端召回的健康服务 Agent”，这两者文本可能完全一样，但业务来源并不一样。数据侧也可以根据这些 ext 和独立 UTM、ActionBarId 把健康服务带来的曝光、点击和最终发消息串起来。
+
+这里还有一个容易被问的点：为什么健康服务虽然在 UI 上和普通 RS 或推荐选项长得很像，却还要单独做埋点？因为视觉复用不代表业务语义相同。普通 RS 表示“推荐用户继续问什么”，健康服务表示“推荐用户启动一个健康服务任务”，因此项目里即使复用了 related recommendation 的展示能力，也会通过 `style=health_service_agent` 把它从普通 RS 统计中分流出去，使用健康服务自己的埋点和 agent_health_plan 归因。否则数据侧会把健康服务点击算进普通推荐追问，最终无法判断到底是哪种入口带来的对话。
+
+最后，也是这题最重要的工程设计，就是为什么输入框、RS、详细解答、健康服务 Agent 等各种入口最终必须统一收敛到 `sendTextMsg`。因为“发送一条消息”在这个项目里从来不只是调一个接口，它背后还包括会话状态检查、`BeforeSendMsg`、Top1 首屏 39998 的 `tailInsert`、消息 ext 拼装、本地用户假消息、SSE/IM 发送分流、日志埋点以及发送后的页面状态更新。如果健康服务自己直接调 chat_sse，详细解答又写另一套发送函数，RS 再调用第三套，那么这些约束一定会有入口漏掉。
+
+这个需求里的 `userSended` 就是最典型的例子。健康服务只应该在用户真正发送第一条消息之前展示，所以只要用户从任何地方发出了消息，`userSended` 都应该变成 true。如果你把 `setUserSended(true)` 写在健康服务按钮自己的 `onClick` 里，那么用户从输入框发消息时就不会更新；如果写在输入框里，用户点 RS 或详细解答又会漏。于是项目把这个状态变化下沉到 `sendTextMsg/sendFileMsg` 这种发送 root cause 上，只要任何入口复用统一发送链路，就天然触发 `userSended=true`，健康服务就能一致隐藏。
+
+不统一发送出口，第一类问题就是重复发送。例如某个健康服务组件自己调用一次底层 `chat_sse`，外围通用 `ActionBar` 点击逻辑又触发了一次公共发送逻辑，那么用户点一次就可能产生两次请求。哪怕不是代码直接调用两次，不同入口各自维护 debounce、loading、disabled 状态，也可能出现一个入口已经处于发送中，另一个入口仍然可点，用户快速连续操作后发起两轮请求。
+
+第二类问题是状态竞态。比如输入框自己的发送逻辑已经把当前用户消息插入本地列表，而健康服务又自己维护一套 optimistic message，那么同一轮会话就可能存在不同来源创建的本地假消息。后续 SSE SEND_USER_MSG ack 和 IM 真消息到达以后，需要做 fake→real 对齐，此时你甚至很难知道哪个本地消息应该被正式消息覆盖，最终就可能出现重复气泡或者 key 冲突。
+
+第三类问题是 Top1 首屏和下一轮消息之间的竞态。你们第一条 39998 还不是正式 IM 真消息，用户开始下一轮发送之前，要通过 `BeforeSendMsg` 触发 `tailInsertSseMsg`，把首屏流式消息进行收口和同步。如果健康服务 Agent 绕过公共 `sendTextMsg` 直接发下一轮请求，那么这个 `BeforeSendMsg` 就可能不执行，第一轮 SSE 假消息还没有正确进入后续会话状态，第二轮模型请求已经开始了。统一发送出口实际上也是在保证“上一轮状态收口完成以后，下一轮才能沿标准链路开始”。
+
+第四类问题是业务参数和埋点可能丢失。统一 `sendTextMsg` 会负责拼已有消息 `ext`，再叠加健康服务的 `ext_params` 和 `ActionBarId`；如果业务组件直接调底层接口，很容易漏掉已有公共参数，导致模型行为、消息身份或者后续数据归因与普通发送链路不一致。这种问题 UI 上可能完全看不出来，但最后 AB 数据会断链。
+
+第五类问题就是副作用分散。发送之后除了真正发请求，还会影响 `userSended`、滚动状态、输入状态、按钮状态、首屏 RS 是否隐藏等很多东西。如果每个入口都自己改这些状态，就会产生“输入框发消息后健康服务消失，但点 RS 后没有消失”这种非常难排查的问题。统一发送出口的价值，本质上不是少写几个函数，而是保证同一种业务事件——用户开始新一轮会话——只能在一个地方触发所有相关状态转换。
+
+新增一种 Agent 卡片要不要改主流程：如果新增 Agent 只是新的业务内容，而且可以复用现有 `health_service_plugins` 或现有 node renderer，那么基本只需要服务端新增协议数据，前端已有 ActionBar/Renderer 就能承接，不需要修改 SSE、IM 和发送主流程；如果视觉形态完全不同，可能需要新增组件和类型映射，但点击以后仍然应该回到统一 `sendTextMsg`。也就是说，可扩展的不是说前端永远零修改，而是新业务尽量只扩展“协议和渲染层”，不复制“消息主链路”。
+
+健康服务 Agent 不是前端写死的一种卡片，而是服务端在原 ActionBar 体系旁边扩展了独立的 `health_service_plugins`，复用通用展示字段，同时通过 `msg_content` 和 `ext_params` 描述点击后真正要发送的模型输入和业务上下文。服务端负责需求推理和服务召回，前端只是协议渲染，所以增加新的健康计划不需要修改会话主流程。
+
+前端在 BottomPlugin 里复用同一个 ActionBar，根据 userSended、enter_position 和是否存在 health_service_plugins，在健康服务和普通 ActionBar 之间互斥选择；因为健康服务是首屏开口承接能力，一旦用户开始聊天就应该退出。用户点击健康服务后，不直接调新接口，而是把服务端下发的 msg_content、ext_params 和 ActionBarId 一起交给统一 sendTextMsg。
+
+之所以必须统一发送，是因为发送动作背后还有 BeforeSendMsg、首屏 tailInsert、会话状态校验、消息 ext、本地假消息、SSE/IM 分流以及 userSended 等全局副作用。如果不同卡片各自实现发送，很容易出现重复请求、状态不一致、第一轮 SSE 尚未收口就开始下一轮、假消息重复以及埋点归因断裂。所以这个需求真正做的不是“增加一个健康服务按钮”，而是把服务端策略生成的新 Agent 能力，以插件协议的方式接进现有渲染体系，再统一收敛到已有消息主链路。
