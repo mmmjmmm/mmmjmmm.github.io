@@ -2700,7 +2700,7 @@ function CatFollower() {
     <MouseTracker
       render={({ x, y }) => (
         <img
-          src="cat.png"
+          src={catImageUrl}
           style={{ position: "absolute", left: x, top: y }}
           alt="跟随鼠标的猫"
         />
